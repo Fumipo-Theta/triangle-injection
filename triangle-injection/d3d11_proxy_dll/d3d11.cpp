@@ -26,6 +26,17 @@ typedef HRESULT(__stdcall* fn_D3D11CreateDeviceAndSwapChain)(
 	D3D_FEATURE_LEVEL*,
 	ID3D11DeviceContext**);
 
+typedef HRESULT(__stdcall* fn_D3D11CreateDevice)(
+	IDXGIAdapter*,
+	D3D_DRIVER_TYPE,
+	HMODULE,
+	UINT,
+	const D3D_FEATURE_LEVEL*,
+	UINT,
+	UINT,
+	ID3D11Device**,
+	D3D_FEATURE_LEVEL*,
+	ID3D11DeviceContext**);
 typedef HRESULT(__stdcall* fn_DXGISwapChain_Present)(IDXGISwapChain*, UINT, UINT);
 
 IDXGISwapChain* swapChain = nullptr;
@@ -172,7 +183,7 @@ void CreateRasterizerAndDepthStates()
 	check(err == S_OK);
 }
 
-fn_D3D11CreateDeviceAndSwapChain LoadD3D11AndGetOriginalFuncPointer()
+template <class T> T LoadD3D11AndGetOriginalFuncPointer(LPCSTR func_name)
 {
 	char path[MAX_PATH];
 	if (!GetSystemDirectoryA(path, MAX_PATH)) return nullptr;
@@ -186,12 +197,31 @@ fn_D3D11CreateDeviceAndSwapChain LoadD3D11AndGetOriginalFuncPointer()
 		return nullptr;
 	}
 
-	return (fn_D3D11CreateDeviceAndSwapChain)GetProcAddress(d3d_dll, TEXT("D3D11CreateDeviceAndSwapChain"));
+	return (T)GetProcAddress(d3d_dll, func_name);
 }
 
 inline void** get_vtable_ptr(void* obj)
 {
 	return *reinterpret_cast<void***>(obj);
+}
+
+extern "C" HRESULT __stdcall D3D11CreateDevice(
+	IDXGIAdapter * pAdapter,
+	D3D_DRIVER_TYPE DriverType,
+	HMODULE Software,
+	UINT Flags,
+	const D3D_FEATURE_LEVEL * pFeatureLevels,
+	UINT FeatureLevels,
+	UINT SDKVersion,
+	ID3D11Device * *ppDevice,
+	D3D_FEATURE_LEVEL * pFeatureLevel,
+	ID3D11DeviceContext * *ppImmediateContext
+)
+{
+	MessageBox(NULL, TEXT("Calling D3D11CreateDevice"), TEXT("Ok"), 0);
+	fn_D3D11CreateDevice D3D11CreateDevice_Orig = LoadD3D11AndGetOriginalFuncPointer<fn_D3D11CreateDevice>("D3D11CreateDevice");
+
+	return D3D11CreateDevice_Orig(pAdapter, DriverType, Software, Flags, pFeatureLevels, FeatureLevels, SDKVersion, ppDevice, pFeatureLevel, ppImmediateContext);
 }
 
 extern "C" HRESULT __stdcall D3D11CreateDeviceAndSwapChain(
@@ -213,7 +243,7 @@ extern "C" HRESULT __stdcall D3D11CreateDeviceAndSwapChain(
 	//this gives you an easy way to make sure you can attach a debugger at the right time
 	//MessageBox(NULL, TEXT("Calling D3D11CreateDeviceAndSwapChain"), TEXT("Ok"), 0);
 
-	fn_D3D11CreateDeviceAndSwapChain D3D11CreateDeviceAndSwapChain_Orig = LoadD3D11AndGetOriginalFuncPointer();
+	fn_D3D11CreateDeviceAndSwapChain D3D11CreateDeviceAndSwapChain_Orig = LoadD3D11AndGetOriginalFuncPointer<fn_D3D11CreateDeviceAndSwapChain>("D3D11CreateDeviceAndSwapChain");
 
 	HRESULT res = D3D11CreateDeviceAndSwapChain_Orig(pAdapter, DriverType, Software, Flags, pFeatureLevels, FeatureLevels, SDKVersion, pSwapChainDesc, ppSwapChain, ppDevice, pFeatureLevel, ppImmediateContext);
 
