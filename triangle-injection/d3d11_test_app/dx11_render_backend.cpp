@@ -1,5 +1,9 @@
 #include "dx11_render_backend.h"
+#include <windows.h>
+#include <wrl/client.h>
+using Microsoft::WRL::ComPtr;
 #pragma comment(lib, "d3d11.lib")
+#pragma comment(lib, "dxgi.lib")
 
 
 DX11RenderBackend& DX() { return *DX11RenderBackend::getInstance(); }
@@ -16,6 +20,9 @@ DX11RenderBackend* DX11RenderBackend::getInstance()
 
 DX11RenderBackend::DX11RenderBackend()
 {
+	ComPtr<IDXGIFactory> factory;
+	checkf(!FAILED(CreateDXGIFactory1(IID_PPV_ARGS(&factory))), "Failed to load factory")
+
 	DXGI_MODE_DESC backBufferDesc;
 	ZeroMemory(&backBufferDesc, sizeof(DXGI_MODE_DESC));
 
@@ -61,20 +68,40 @@ DX11RenderBackend::DX11RenderBackend()
 	ID3D11Device* tempDevice;
 	ID3D11DeviceContext* tempContext;
 
-	HRESULT hr = D3D11CreateDeviceAndSwapChain(NULL,  //use default adapter
+	HRESULT hr = D3D11CreateDevice(
+		NULL, //use default adapter
 		D3D_DRIVER_TYPE_HARDWARE, //use the gpu for direct3d
 		NULL, //don't use software rasterizing
 		isDebugBuild ? D3D11_CREATE_DEVICE_DEBUG : NULL, //no flags
 		NULL, //use the highest feature level available
 		NULL, //number of elements in the previous feature level array
 		D3D11_SDK_VERSION,  //the version of the sdk to use
-		&swapChainDesc,
-		&swapChain,
 		&tempDevice,
 		NULL, //pointer to get the highest feature level available
-		&tempContext);
+		&tempContext
+		);
+	checkf(!FAILED(hr), "Failed to create device");
 
-	checkf(!FAILED(hr), "Failed to create swapchain and device");
+	hr = factory -> CreateSwapChain(
+		tempDevice,
+		&swapChainDesc,
+		&swapChain
+	);
+
+	//HRESULT hr = D3D11CreateDeviceAndSwapChain(NULL,  //use default adapter
+	//	D3D_DRIVER_TYPE_HARDWARE, //use the gpu for direct3d
+	//	NULL, //don't use software rasterizing
+	//	isDebugBuild ? D3D11_CREATE_DEVICE_DEBUG : NULL, //no flags
+	//	NULL, //use the highest feature level available
+	//	NULL, //number of elements in the previous feature level array
+	//	D3D11_SDK_VERSION,  //the version of the sdk to use
+	//	&swapChainDesc,
+	//	&swapChain,
+	//	&tempDevice,
+	//	NULL, //pointer to get the highest feature level available
+	//	&tempContext);
+
+	checkf(!FAILED(hr), "Failed to create swapchain");
 
 	//we need a ID3D11Device5 interface so we can use fences to synchronize with compute shaders
 	hr = tempDevice->QueryInterface(__uuidof(ID3D11Device5), (void**)&device);
